@@ -1,10 +1,14 @@
 import { ref } from 'vue'
 
-let entranceLogged = false
-let reachedPositionLogged = false
-
 export function useCharacterLayout() {
-  const anchorHidden = ref(false)
+  const anchorHidden = ref(true)
+  let entranceLogged = false
+  let reachedPositionLogged = false
+
+  function resetSessionLogs(): void {
+    entranceLogged = false
+    reachedPositionLogged = false
+  }
 
   function onArrivalStarted(): void {
     if (entranceLogged) {
@@ -22,6 +26,10 @@ export function useCharacterLayout() {
     console.log('[Companion] Character reached position')
   }
 
+  function showCompanion(): void {
+    anchorHidden.value = false
+  }
+
   function hideCompanion(): void {
     anchorHidden.value = true
     console.log('[Companion] Companion hidden')
@@ -29,8 +37,10 @@ export function useCharacterLayout() {
 
   return {
     anchorHidden,
+    resetSessionLogs,
     onArrivalStarted,
     onArrivalFinished,
+    showCompanion,
     hideCompanion,
   }
 }

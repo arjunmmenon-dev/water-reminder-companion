@@ -1,4 +1,4 @@
-import { nextTick, onMounted, ref, useTemplateRef } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, useTemplateRef } from 'vue'
 import { ANIMATION_CLIPS, type AnimationState } from '../types/animation'
 
 const REMINDER_BEFORE_END_SEC = 2.5
@@ -7,9 +7,11 @@ export function useCompanionAnimation(options: {
   onArrivalStarted: () => void
   onArrivalFinished: () => void
   onYesHappyComplete: () => void
+  onInteractionComplete: () => void
+  onSessionStart: () => void
 }) {
   const state = ref<AnimationState>('arriving')
-  const currentSrc = ref<string>(ANIMATION_CLIPS.arrive)
+  const currentSrc = ref<string>('')
   const showReminder = ref(false)
   const videoRef = useTemplateRef<HTMLVideoElement>('companionVideo')
   let arrivalPlayLogged = false
@@ -25,6 +27,15 @@ export function useCompanionAnimation(options: {
   function resetArrivalReminderScheduling(): void {
     reminderShown = false
     arrivalReminderLocked = false
+  }
+
+  function resetSessionState(): void {
+    arrivalPlayLogged = false
+    yesHappyPlayingLogged = false
+    resetArrivalReminderScheduling()
+    state.value = 'arriving'
+    showReminder.value = false
+    currentSrc.value = ''
   }
 
   function lockArrivalReminderScheduling(): void {
@@ -57,6 +68,13 @@ export function useCompanionAnimation(options: {
     } catch {
       logVideoLoadError(video)
     }
+  }
+
+  async function triggerReminder(source: 'scheduled' | 'test'): Promise<void> {
+    console.log(`[Companion] Reminder flow started (${source})`)
+    resetSessionState()
+    options.onSessionStart()
+    await playSrc(ANIMATION_CLIPS.arrive)
   }
 
   function onVideoLoadedMetadata(): void {
@@ -111,6 +129,7 @@ export function useCompanionAnimation(options: {
 
     if (state.value === 'remindLater') {
       console.log('[Companion] Sad animation finished')
+      options.onInteractionComplete()
       return
     }
 
@@ -119,6 +138,7 @@ export function useCompanionAnimation(options: {
       console.log('[Companion] Character exited via video')
       currentSrc.value = ''
       options.onYesHappyComplete()
+      options.onInteractionComplete()
     }
   }
 
@@ -161,10 +181,20 @@ export function useCompanionAnimation(options: {
     await playSrc(ANIMATION_CLIPS.yesHappy)
   }
 
+  let unsubscribeTrigger: (() => void) | undefined
+
   onMounted(() => {
     console.log('[Companion] Application started')
-    resetArrivalReminderScheduling()
-    void playSrc(ANIMATION_CLIPS.arrive)
+    const api = window.desktopCompanion
+    if (api?.onReminderTrigger) {
+      unsubscribeTrigger = api.onReminderTrigger((payload) => {
+        void triggerReminder(payload.source)
+      })
+    }
+  })
+
+  onUnmounted(() => {
+    unsubscribeTrigger?.()
   })
 
   return {
@@ -179,5 +209,6 @@ export function useCompanionAnimation(options: {
     onVideoTimeUpdate,
     onRemindLater,
     onYes,
+    triggerReminder,
   }
 }
