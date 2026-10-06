@@ -24,8 +24,8 @@ const emit = defineEmits<{
 <style scoped>
 .reminder-ui {
   position: absolute;
-  bottom: calc(100% - 48px);
-  left: 58%;
+  bottom: calc(100% + 28px);
+  left: 50%;
   z-index: 2;
   width: min(280px, 92vw);
   transform: translateX(-50%);
@@ -45,7 +45,7 @@ const emit = defineEmits<{
 .speech-bubble::after {
   content: '';
   position: absolute;
-  left: 38%;
+  left: 50%;
   bottom: -10px;
   width: 18px;
   height: 18px;

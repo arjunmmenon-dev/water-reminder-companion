@@ -13,6 +13,8 @@ const {
   onVideoEnded,
   onVideoError,
   onVideoPlaying,
+  onVideoLoadedMetadata,
+  onVideoTimeUpdate,
   onRemindLater,
   onYes,
 } = useCompanionAnimation({
@@ -27,24 +29,28 @@ usePointerPassthrough(anchorHidden)
 <template>
   <div class="companion-stage">
     <div v-show="!anchorHidden" class="character-anchor">
-      <ReminderBubble
-        v-if="showReminder"
-        @remind-later="onRemindLater"
-        @yes="onYes"
-      />
+      <div class="character-content">
+        <ReminderBubble
+          v-if="showReminder"
+          @remind-later="onRemindLater"
+          @yes="onYes"
+        />
 
-      <video
-        ref="companionVideo"
-        class="character-video"
-        :src="currentSrc"
-        autoplay
-        playsinline
-        muted
-        preload="auto"
-        @ended="onVideoEnded"
-        @error="onVideoError"
-        @playing="onVideoPlaying"
-      />
+        <video
+          ref="companionVideo"
+          class="character-video"
+          :src="currentSrc"
+          autoplay
+          playsinline
+          muted
+          preload="auto"
+          @ended="onVideoEnded"
+          @error="onVideoError"
+          @playing="onVideoPlaying"
+          @loadedmetadata="onVideoLoadedMetadata"
+          @timeupdate="onVideoTimeUpdate"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -64,6 +70,11 @@ usePointerPassthrough(anchorHidden)
   bottom: 20px;
   display: block;
   pointer-events: auto;
+}
+
+.character-content {
+  position: relative;
+  display: inline-block;
 }
 
 .character-video {

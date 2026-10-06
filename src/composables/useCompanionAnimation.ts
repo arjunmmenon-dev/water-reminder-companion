@@ -1,6 +1,8 @@
 import { nextTick, onMounted, ref, useTemplateRef } from 'vue'
 import { ANIMATION_CLIPS, type AnimationState } from '../types/animation'
 
+const REMINDER_BEFORE_END_SEC = 2.5
+
 export function useCompanionAnimation(options: {
   onArrivalStarted: () => void
   onArrivalFinished: () => void
@@ -8,15 +10,36 @@ export function useCompanionAnimation(options: {
 }) {
   const state = ref<AnimationState>('arriving')
   const currentSrc = ref<string>(ANIMATION_CLIPS.arrive)
+  const showReminder = ref(false)
   const videoRef = useTemplateRef<HTMLVideoElement>('companionVideo')
   let arrivalPlayLogged = false
   let yesHappyPlayingLogged = false
-
-  const showReminder = ref(false)
+  let reminderShown = false
+  let arrivalReminderLocked = false
 
   function logVideoLoadError(target: HTMLVideoElement): void {
     const path = target.currentSrc || target.src
     console.error(`[Companion] Video failed to load: ${path}`)
+  }
+
+  function resetArrivalReminderScheduling(): void {
+    reminderShown = false
+    arrivalReminderLocked = false
+  }
+
+  function lockArrivalReminderScheduling(): void {
+    arrivalReminderLocked = true
+  }
+
+  function showReminderOnce(fromEarlyTrigger = false): void {
+    if (reminderShown) {
+      return
+    }
+    reminderShown = true
+    showReminder.value = true
+    if (fromEarlyTrigger) {
+      console.log('[Companion] Reminder shown before arrival finished')
+    }
   }
 
   async function playSrc(src: string): Promise<void> {
@@ -36,6 +59,37 @@ export function useCompanionAnimation(options: {
     }
   }
 
+  function onVideoLoadedMetadata(): void {
+    if (state.value !== 'arriving') {
+      return
+    }
+
+    const video = videoRef.value
+    if (!video || !Number.isFinite(video.duration)) {
+      return
+    }
+
+    const triggerTime = Math.max(0, video.duration - REMINDER_BEFORE_END_SEC)
+    console.log(`[Companion] Arrival duration: ${video.duration}`)
+    console.log(`[Companion] Reminder trigger time: ${triggerTime}`)
+  }
+
+  function onVideoTimeUpdate(): void {
+    if (state.value !== 'arriving' || arrivalReminderLocked) {
+      return
+    }
+
+    const video = videoRef.value
+    if (!video || !Number.isFinite(video.duration)) {
+      return
+    }
+
+    const triggerTime = Math.max(0, video.duration - REMINDER_BEFORE_END_SEC)
+    if (video.currentTime >= triggerTime) {
+      showReminderOnce(true)
+    }
+  }
+
   function onVideoEnded(): void {
     const video = videoRef.value
     if (!video) {
@@ -45,10 +99,13 @@ export function useCompanionAnimation(options: {
     video.pause()
 
     if (state.value === 'arriving') {
+      lockArrivalReminderScheduling()
+      if (!reminderShown) {
+        showReminderOnce()
+      }
       options.onArrivalFinished()
       state.value = 'reminder'
-      showReminder.value = true
-      console.log('[Companion] Reminder displayed')
+      console.log('[Companion] Arrival animation finished')
       return
     }
 
@@ -88,6 +145,7 @@ export function useCompanionAnimation(options: {
 
   async function onRemindLater(): Promise<void> {
     console.log('[Companion] Remind later clicked')
+    lockArrivalReminderScheduling()
     showReminder.value = false
     state.value = 'remindLater'
     console.log('[Companion] Sad animation started')
@@ -96,6 +154,7 @@ export function useCompanionAnimation(options: {
 
   async function onYes(): Promise<void> {
     console.log('[Companion] YES clicked')
+    lockArrivalReminderScheduling()
     showReminder.value = false
     state.value = 'yesHappy'
     console.log('[Companion] Happy animation started')
@@ -104,6 +163,7 @@ export function useCompanionAnimation(options: {
 
   onMounted(() => {
     console.log('[Companion] Application started')
+    resetArrivalReminderScheduling()
     void playSrc(ANIMATION_CLIPS.arrive)
   })
 
@@ -115,6 +175,8 @@ export function useCompanionAnimation(options: {
     onVideoEnded,
     onVideoError,
     onVideoPlaying,
+    onVideoLoadedMetadata,
+    onVideoTimeUpdate,
     onRemindLater,
     onYes,
   }
