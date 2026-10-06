@@ -19,9 +19,12 @@ export function useCompanionAnimation(options: {
   let reminderShown = false
   let arrivalReminderLocked = false
 
-  function logVideoLoadError(target: HTMLVideoElement): void {
+  function logVideoLoadError(
+    target: HTMLVideoElement,
+    error?: unknown,
+  ): void {
     const path = target.currentSrc || target.src
-    console.error(`[Companion] Video failed to load: ${path}`)
+    console.error(`[Companion] Video error: ${path}`, error)
   }
 
   function resetArrivalReminderScheduling(): void {
@@ -59,14 +62,17 @@ export function useCompanionAnimation(options: {
 
     const video = videoRef.value
     if (!video) {
+      console.error('[Companion] Video element not available for playback')
       return
     }
 
     try {
+      video.pause()
+      video.currentTime = 0
       video.load()
       await video.play()
-    } catch {
-      logVideoLoadError(video)
+    } catch (error) {
+      logVideoLoadError(video, error)
     }
   }
 
@@ -145,7 +151,7 @@ export function useCompanionAnimation(options: {
   function onVideoError(event: Event): void {
     const target = event.target
     if (target instanceof HTMLVideoElement) {
-      logVideoLoadError(target)
+      logVideoLoadError(target, event)
     }
   }
 
@@ -157,6 +163,7 @@ export function useCompanionAnimation(options: {
 
     if (state.value === 'yesHappy' && !yesHappyPlayingLogged) {
       yesHappyPlayingLogged = true
+      console.log('[Companion] Happy animation play started')
       console.log(
         '[Companion] Happy animation playing — container position locked',
       )
@@ -177,7 +184,8 @@ export function useCompanionAnimation(options: {
     lockArrivalReminderScheduling()
     showReminder.value = false
     state.value = 'yesHappy'
-    console.log('[Companion] Happy animation started')
+    console.log('[Companion] Switching to happy animation')
+    console.log(`[Companion] Happy animation source: ${ANIMATION_CLIPS.yesHappy}`)
     await playSrc(ANIMATION_CLIPS.yesHappy)
   }
 
