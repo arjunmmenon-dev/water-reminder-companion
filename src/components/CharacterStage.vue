@@ -1,9 +1,21 @@
 <script setup lang="ts">
+import { useTemplateRef } from 'vue'
 import { useCharacterDisplay } from '../composables/useCharacterDisplay'
 import { useCharacterLayout } from '../composables/useCharacterLayout'
 import { useCompanionAnimation } from '../composables/useCompanionAnimation'
+import { useHappyWrapperMovement } from '../composables/useHappyWrapperMovement'
 import { usePointerPassthrough } from '../composables/usePointerPassthrough'
 import ReminderBubble from './ReminderBubble.vue'
+
+const happyMovementWrapperRef = useTemplateRef<HTMLElement>(
+  'happyMovementWrapper',
+)
+const {
+  movementStyle: happyMovementStyle,
+  begin: beginHappyMovement,
+  syncVideoTime: syncHappyMovement,
+  stop: stopHappyMovement,
+} = useHappyWrapperMovement()
 
 const {
   anchorHidden,
@@ -37,6 +49,10 @@ const {
   onInteractionComplete: () => {
     window.desktopCompanion?.notifyReminderComplete?.()
   },
+  getHappyMovementWrapper: () => happyMovementWrapperRef.value,
+  onYesHappyMovementBegin: beginHappyMovement,
+  onYesHappyMovementSync: syncHappyMovement,
+  onYesHappyMovementStop: stopHappyMovement,
 })
 
 usePointerPassthrough(anchorHidden)
@@ -50,7 +66,12 @@ usePointerPassthrough(anchorHidden)
       :class="anchorClass"
       :style="anchorStyle"
     >
-      <div class="character-content">
+      <div
+        ref="happyMovementWrapper"
+        class="happy-movement-wrapper"
+        :style="happyMovementStyle"
+      >
+        <div class="character-content">
         <ReminderBubble
           v-if="showReminder"
           @remind-later="onRemindLater"
@@ -71,6 +92,7 @@ usePointerPassthrough(anchorHidden)
           @loadedmetadata="onVideoLoadedMetadata"
           @timeupdate="onVideoTimeUpdate"
         />
+        </div>
       </div>
     </div>
   </div>
@@ -106,6 +128,11 @@ usePointerPassthrough(anchorHidden)
 .character-anchor.position-bottom-right {
   left: auto;
   right: 0;
+}
+
+.happy-movement-wrapper {
+  display: inline-block;
+  will-change: transform;
 }
 
 .character-content {

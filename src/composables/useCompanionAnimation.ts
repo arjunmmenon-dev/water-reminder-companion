@@ -9,6 +9,13 @@ export function useCompanionAnimation(options: {
   onYesHappyComplete: () => void
   onInteractionComplete: () => void
   onSessionStart: () => void
+  getHappyMovementWrapper?: () => HTMLElement | null
+  onYesHappyMovementBegin?: (
+    wrapper: HTMLElement | null,
+    video: HTMLVideoElement | null,
+  ) => void
+  onYesHappyMovementSync?: (currentTime: number, duration: number) => void
+  onYesHappyMovementStop?: () => void
 }) {
   const state = ref<AnimationState>('arriving')
   const currentSrc = ref<string>('')
@@ -36,6 +43,7 @@ export function useCompanionAnimation(options: {
     arrivalPlayLogged = false
     yesHappyPlayingLogged = false
     resetArrivalReminderScheduling()
+    options.onYesHappyMovementStop?.()
     state.value = 'arriving'
     showReminder.value = false
     currentSrc.value = ''
@@ -99,12 +107,21 @@ export function useCompanionAnimation(options: {
   }
 
   function onVideoTimeUpdate(): void {
+    const video = videoRef.value
+    if (!video) {
+      return
+    }
+
+    if (state.value === 'yesHappy' && Number.isFinite(video.duration)) {
+      options.onYesHappyMovementSync?.(video.currentTime, video.duration)
+      return
+    }
+
     if (state.value !== 'arriving' || arrivalReminderLocked) {
       return
     }
 
-    const video = videoRef.value
-    if (!video || !Number.isFinite(video.duration)) {
+    if (!Number.isFinite(video.duration)) {
       return
     }
 
@@ -140,8 +157,8 @@ export function useCompanionAnimation(options: {
     }
 
     if (state.value === 'yesHappy') {
-      console.log('[Companion] Happy animation finished')
-      console.log('[Companion] Character exited via video')
+      options.onYesHappyMovementStop?.()
+      console.log('[Companion] Happy animation ended')
       currentSrc.value = ''
       options.onYesHappyComplete()
       options.onInteractionComplete()
@@ -164,9 +181,6 @@ export function useCompanionAnimation(options: {
     if (state.value === 'yesHappy' && !yesHappyPlayingLogged) {
       yesHappyPlayingLogged = true
       console.log('[Companion] Happy animation play started')
-      console.log(
-        '[Companion] Happy animation playing — container position locked',
-      )
     }
   }
 
@@ -187,6 +201,10 @@ export function useCompanionAnimation(options: {
     console.log('[Companion] Switching to happy animation')
     console.log(`[Companion] Happy animation source: ${ANIMATION_CLIPS.yesHappy}`)
     await playSrc(ANIMATION_CLIPS.yesHappy)
+    options.onYesHappyMovementBegin?.(
+      options.getHappyMovementWrapper?.() ?? null,
+      videoRef.value,
+    )
   }
 
   let unsubscribeTrigger: (() => void) | undefined
