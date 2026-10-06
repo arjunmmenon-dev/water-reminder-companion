@@ -25,7 +25,7 @@ export function usePointerPassthrough(anchorHidden: Ref<boolean>): void {
     }
 
     const el = document.elementFromPoint(x, y)
-    const overCompanion = Boolean(el?.closest('.character-anchor'))
+    const overCompanion = Boolean(el?.closest('.reminder-ui'))
     api.setIgnoreMouseEvents(!overCompanion)
   }
 

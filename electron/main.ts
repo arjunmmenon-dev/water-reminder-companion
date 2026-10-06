@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -7,23 +7,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
-  const primary = screen.getPrimaryDisplay()
-  const { x, y, width, height } = primary.bounds
+  const { width, height } = screen.getPrimaryDisplay().bounds
 
   mainWindow = new BrowserWindow({
-    x,
-    y,
+    x: 0,
+    y: 0,
     width,
     height,
+    title: '',
     frame: false,
+    thickFrame: false,
     transparent: true,
-    alwaysOnTop: true,
+    autoHideMenuBar: true,
     resizable: false,
     movable: false,
+    alwaysOnTop: true,
+    focusable: false,
     skipTaskbar: true,
     show: false,
     hasShadow: false,
     backgroundColor: '#00000000',
+    ...(process.platform === 'win32' ? { backgroundMaterial: 'none' } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -31,7 +35,25 @@ function createWindow(): void {
     },
   })
 
+  Menu.setApplicationMenu(null)
+  mainWindow.setMenuBarVisibility(false)
+  mainWindow.setAutoHideMenuBar(true)
+  mainWindow.setTitle('')
+  if (process.platform === 'win32') {
+    mainWindow.setBackgroundMaterial('none')
+  }
   mainWindow.setIgnoreMouseEvents(true, { forward: true })
+
+  mainWindow.on('page-title-updated', (event) => {
+    event.preventDefault()
+    mainWindow?.setTitle('')
+  })
+
+  const bounds = mainWindow.getBounds()
+  console.log('[Companion] Native Electron BrowserWindow created')
+  console.log(
+    `[Companion] BrowserWindow id=${mainWindow.id} bounds=${JSON.stringify(bounds)}`,
+  )
 
   mainWindow.once('ready-to-show', () => {
     console.log('[Companion] Full-screen transparent stage created')
@@ -68,6 +90,7 @@ ipcMain.on(
 )
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   createWindow()
 
   app.on('activate', () => {
