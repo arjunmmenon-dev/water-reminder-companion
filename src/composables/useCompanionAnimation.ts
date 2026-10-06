@@ -1,11 +1,16 @@
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
 import { ANIMATION_CLIPS, type AnimationState } from '../types/animation'
 
-export function useCompanionAnimation() {
+export function useCompanionAnimation(options: {
+  onArrivalStarted: () => void
+  onArrivalFinished: () => void
+  onYesHappyComplete: () => void
+}) {
   const state = ref<AnimationState>('arriving')
   const currentSrc = ref<string>(ANIMATION_CLIPS.arrive)
   const videoRef = useTemplateRef<HTMLVideoElement>('companionVideo')
-  let arrivalStartLogged = false
+  let arrivalPlayLogged = false
+  let yesHappyPlayingLogged = false
 
   const showReminderUi = computed(() => state.value === 'reminder')
 
@@ -40,7 +45,7 @@ export function useCompanionAnimation() {
     video.pause()
 
     if (state.value === 'arriving') {
-      console.log('[Companion] Arrival animation finished')
+      options.onArrivalFinished()
       state.value = 'reminder'
       console.log('[Companion] Reminder displayed')
       return
@@ -53,6 +58,9 @@ export function useCompanionAnimation() {
 
     if (state.value === 'yesHappy') {
       console.log('[Companion] Happy animation finished')
+      console.log('[Companion] Character exited via video')
+      currentSrc.value = ''
+      options.onYesHappyComplete()
     }
   }
 
@@ -64,9 +72,16 @@ export function useCompanionAnimation() {
   }
 
   function onVideoPlaying(): void {
-    if (state.value === 'arriving' && !arrivalStartLogged) {
-      arrivalStartLogged = true
-      console.log('[Companion] Arrival animation started')
+    if (state.value === 'arriving' && !arrivalPlayLogged) {
+      arrivalPlayLogged = true
+      options.onArrivalStarted()
+    }
+
+    if (state.value === 'yesHappy' && !yesHappyPlayingLogged) {
+      yesHappyPlayingLogged = true
+      console.log(
+        '[Companion] Happy animation playing — container position locked',
+      )
     }
   }
 

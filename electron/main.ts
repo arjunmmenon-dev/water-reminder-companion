@@ -6,22 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let mainWindow: BrowserWindow | null = null
 
-const WINDOW_WIDTH = 500
-const WINDOW_HEIGHT = 500
-const WINDOW_MARGIN = 16
-
-function positionWindowBottomLeft(win: BrowserWindow): void {
-  const { x, y, width, height } = screen.getPrimaryDisplay().workArea
-  win.setPosition(
-    x + WINDOW_MARGIN,
-    y + height - WINDOW_HEIGHT - WINDOW_MARGIN,
-  )
-}
-
 function createWindow(): void {
+  const primary = screen.getPrimaryDisplay()
+  const { x, y, width, height } = primary.bounds
+
   mainWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+    x,
+    y,
+    width,
+    height,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -29,6 +22,7 @@ function createWindow(): void {
     movable: false,
     skipTaskbar: true,
     show: false,
+    hasShadow: false,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -37,11 +31,10 @@ function createWindow(): void {
     },
   })
 
-  if (mainWindow) {
-    positionWindowBottomLeft(mainWindow)
-  }
+  mainWindow.setIgnoreMouseEvents(true, { forward: true })
 
   mainWindow.once('ready-to-show', () => {
+    console.log('[Companion] Full-screen transparent stage created')
     mainWindow?.show()
   })
 
@@ -57,6 +50,22 @@ function createWindow(): void {
 }
 
 ipcMain.handle('desktop-companion:ping', () => 'pong')
+
+ipcMain.handle('desktop-companion:cursor-point', () => screen.getCursorScreenPoint())
+
+ipcMain.handle('desktop-companion:window-bounds', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  const bounds = win?.getBounds()
+  return bounds ?? { x: 0, y: 0, width: 0, height: 0 }
+})
+
+ipcMain.on(
+  'desktop-companion:set-ignore-mouse-events',
+  (event, ignore: boolean) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.setIgnoreMouseEvents(ignore, { forward: true })
+  },
+)
 
 app.whenReady().then(() => {
   createWindow()

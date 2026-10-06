@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { useCharacterLayout } from '../composables/useCharacterLayout'
 import { useCompanionAnimation } from '../composables/useCompanionAnimation'
+import { usePointerPassthrough } from '../composables/usePointerPassthrough'
 import ReminderBubble from './ReminderBubble.vue'
+
+const { anchorHidden, onArrivalStarted, onArrivalFinished, hideCompanion } =
+  useCharacterLayout()
 
 const {
   currentSrc,
@@ -10,18 +15,24 @@ const {
   onVideoPlaying,
   onRemindLater,
   onYes,
-} = useCompanionAnimation()
+} = useCompanionAnimation({
+  onArrivalStarted,
+  onArrivalFinished,
+  onYesHappyComplete: hideCompanion,
+})
+
+usePointerPassthrough(anchorHidden)
 </script>
 
 <template>
-  <div class="character-stage">
-    <ReminderBubble
-      :visible="showReminderUi"
-      @remind-later="onRemindLater"
-      @yes="onYes"
-    />
+  <div class="companion-stage">
+    <div v-show="!anchorHidden" class="character-anchor">
+      <ReminderBubble
+        :visible="showReminderUi"
+        @remind-later="onRemindLater"
+        @yes="onYes"
+      />
 
-    <div class="character-layer">
       <video
         ref="companionVideo"
         class="character-video"
@@ -39,34 +50,29 @@ const {
 </template>
 
 <style scoped>
-.character-stage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
+.companion-stage {
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   background: transparent;
+  pointer-events: none;
 }
 
-.character-layer {
-  width: 100%;
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 4px;
-  pointer-events: none;
+.character-anchor {
+  position: absolute;
+  left: 0;
+  bottom: 20px;
+  display: block;
+  pointer-events: auto;
 }
 
 .character-video {
   display: block;
-  width: 100%;
-  max-height: 100%;
+  width: 600px;
+  height: auto;
+  aspect-ratio: 16 / 9;
   object-fit: contain;
-  object-position: center bottom;
   background: transparent;
+  pointer-events: none;
 }
 </style>

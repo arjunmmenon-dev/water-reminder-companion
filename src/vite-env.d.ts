@@ -8,6 +8,14 @@ declare module '*.vue' {
 
 interface DesktopCompanionApi {
   ping: () => Promise<string>
+  getCursorScreenPoint: () => Promise<{ x: number; y: number }>
+  getWindowBounds: () => Promise<{
+    x: number
+    y: number
+    width: number
+    height: number
+  }>
+  setIgnoreMouseEvents: (ignore: boolean) => void
 }
 
 declare global {
