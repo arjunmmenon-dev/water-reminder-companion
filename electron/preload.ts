@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld('settingsApi', {
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: AppSettings): Promise<AppSettings> =>
     ipcRenderer.invoke('settings:save', settings),
+  completeSetup: (settings: AppSettings): Promise<AppSettings> =>
+    ipcRenderer.invoke('settings:complete-setup', settings),
   testReminder: (): Promise<void> => ipcRenderer.invoke('reminder:test'),
   getSchedulerStatus: (): Promise<SchedulerStatus> =>
     ipcRenderer.invoke('scheduler:status'),

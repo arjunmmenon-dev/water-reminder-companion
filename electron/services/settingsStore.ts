@@ -67,6 +67,7 @@ export function normalizeSettings(raw: unknown): AppSettings {
     : DEFAULT_SETTINGS.reminders.intervalMinutes
 
   return {
+    setupCompleted: source.setupCompleted === true,
     general: {
       startWithWindows:
         typeof general.startWithWindows === 'boolean'

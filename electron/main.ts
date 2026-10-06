@@ -17,6 +17,7 @@ import {
   updateSchedulerSettings,
 } from './services/scheduler'
 import { loadSettings, saveSettings } from './services/settingsStore'
+import { getAppIconPath } from './appPaths'
 import { createTrayIcon } from './trayIcon'
 import { CHARACTER_WIDTH_PX, type AppSettings } from '../src/shared/settings'
 
@@ -24,8 +25,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let companionWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
+let settingsWindowMode: 'setup' | 'settings' | null = null
 let tray: Tray | null = null
+let schedulerStarted = false
 let currentSettings: AppSettings = loadSettings()
+
+function getWindowIconOptions(): { icon: string } | Record<string, never> {
+  const iconPath = getAppIconPath()
+  return iconPath ? { icon: iconPath } : {}
+}
 
 function getDisplaySettingsPayload() {
   return {
@@ -33,6 +41,13 @@ function getDisplaySettingsPayload() {
     characterPosition: currentSettings.general.characterPosition,
     videoWidthPx: CHARACTER_WIDTH_PX[currentSettings.general.characterSize],
   }
+}
+
+function settingsPageUrl(mode: 'setup' | 'settings'): string {
+  if (process.env.VITE_DEV_SERVER_URL) {
+    return `${process.env.VITE_DEV_SERVER_URL}settings.html?mode=${mode}`
+  }
+  return `file://${path.join(__dirname, '../dist/settings.html')}?mode=${mode}`
 }
 
 function broadcastSchedulerStatus(): void {
@@ -58,9 +73,15 @@ function pushDisplaySettingsToCompanion(): void {
 }
 
 function createCompanionWindow(): void {
+  if (companionWindow && !companionWindow.isDestroyed()) {
+    pushDisplaySettingsToCompanion()
+    return
+  }
+
   const { width, height } = screen.getPrimaryDisplay().bounds
 
   companionWindow = new BrowserWindow({
+    ...getWindowIconOptions(),
     x: 0,
     y: 0,
     width,
@@ -127,17 +148,25 @@ function createCompanionWindow(): void {
   })
 }
 
-function createSettingsWindow(): void {
+function createSettingsWindow(mode: 'setup' | 'settings'): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.focus()
-    return
+    if (settingsWindowMode === mode) {
+      settingsWindow.focus()
+      return
+    }
+    settingsWindow.close()
   }
 
+  settingsWindowMode = mode
+  const isSetup = mode === 'setup'
+
   settingsWindow = new BrowserWindow({
-    width: 500,
-    height: 700,
-    title: 'Desktop Companion Settings',
-    resizable: true,
+    ...getWindowIconOptions(),
+    width: 540,
+    height: isSetup ? 760 : 700,
+    center: true,
+    title: isSetup ? 'Desktop Companion Setup' : 'Desktop Companion Settings',
+    resizable: !isSetup,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -147,25 +176,57 @@ function createSettingsWindow(): void {
   })
 
   settingsWindow.once('ready-to-show', () => {
-    console.log('[Settings] Settings window opened')
+    console.log(
+      isSetup ? '[Settings] Setup window opened' : '[Settings] Settings window opened',
+    )
     settingsWindow?.show()
-    broadcastSchedulerStatus()
+    if (!isSetup) {
+      broadcastSchedulerStatus()
+    }
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {
-    settingsWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}settings.html`)
+    settingsWindow.loadURL(settingsPageUrl(mode))
   } else {
-    settingsWindow.loadFile(path.join(__dirname, '../dist/settings.html'))
+    settingsWindow.loadFile(path.join(__dirname, '../dist/settings.html'), {
+      query: { mode },
+    })
   }
 
   settingsWindow.on('closed', () => {
     settingsWindow = null
+    settingsWindowMode = null
   })
+}
+
+function startCompanionAndScheduler(): void {
+  createCompanionWindow()
+
+  if (!schedulerStarted) {
+    initializeScheduler(currentSettings, (source) => {
+      sendCompanionTrigger(source)
+      broadcastSchedulerStatus()
+    })
+    schedulerStarted = true
+  } else {
+    updateSchedulerSettings(currentSettings)
+  }
+
+  broadcastSchedulerStatus()
 }
 
 function createTray(): void {
   tray = new Tray(createTrayIcon())
   tray.setToolTip('Desktop Companion')
+  updateTrayMenu()
+}
+
+function updateTrayMenu(): void {
+  if (!tray) {
+    return
+  }
+
+  const setupDone = currentSettings.setupCompleted
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -176,12 +237,20 @@ function createTray(): void {
     {
       label: 'Settings',
       click: () => {
-        createSettingsWindow()
+        if (!currentSettings.setupCompleted) {
+          createSettingsWindow('setup')
+          return
+        }
+        createSettingsWindow('settings')
       },
     },
     {
       label: 'Test Reminder',
+      enabled: setupDone && Boolean(companionWindow),
       click: () => {
+        if (!currentSettings.setupCompleted) {
+          return
+        }
         triggerReminder('test')
       },
     },
@@ -230,16 +299,38 @@ function registerIpcHandlers(): void {
   ipcMain.handle('settings:get', () => currentSettings)
 
   ipcMain.handle('settings:save', (_event, settings: AppSettings) => {
-    currentSettings = saveSettings(settings)
+    const next = { ...settings, setupCompleted: currentSettings.setupCompleted }
+    currentSettings = saveSettings(next)
     applyStartWithWindows(currentSettings.general.startWithWindows)
-    updateSchedulerSettings(currentSettings)
-    pushDisplaySettingsToCompanion()
+    if (schedulerStarted) {
+      updateSchedulerSettings(currentSettings)
+      pushDisplaySettingsToCompanion()
+    }
     broadcastSchedulerStatus()
+    updateTrayMenu()
     console.log('[Settings] Settings saved')
     return currentSettings
   })
 
+  ipcMain.handle('settings:complete-setup', (_event, settings: AppSettings) => {
+    currentSettings = saveSettings({ ...settings, setupCompleted: true })
+    applyStartWithWindows(currentSettings.general.startWithWindows)
+    console.log('[Settings] Settings saved')
+    console.log('[Settings] First-launch setup completed')
+
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close()
+    }
+
+    startCompanionAndScheduler()
+    updateTrayMenu()
+    return currentSettings
+  })
+
   ipcMain.handle('reminder:test', () => {
+    if (!currentSettings.setupCompleted) {
+      return
+    }
     triggerReminder('test')
   })
 
@@ -248,19 +339,23 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
+
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.desktop.companion')
+  }
+
   currentSettings = loadSettings()
-  applyStartWithWindows(currentSettings.general.startWithWindows)
 
   registerIpcHandlers()
-  createCompanionWindow()
   createTray()
 
-  initializeScheduler(currentSettings, (source) => {
-    sendCompanionTrigger(source)
-    broadcastSchedulerStatus()
-  })
+  if (!currentSettings.setupCompleted) {
+    createSettingsWindow('setup')
+    return
+  }
 
-  broadcastSchedulerStatus()
+  applyStartWithWindows(currentSettings.general.startWithWindows)
+  startCompanionAndScheduler()
 })
 
 app.on('window-all-closed', () => {

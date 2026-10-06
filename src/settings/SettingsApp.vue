@@ -9,6 +9,8 @@ import {
   type SchedulerStatus,
 } from '../shared/settings'
 
+const isSetupMode = new URLSearchParams(window.location.search).get('mode') === 'setup'
+
 const form = reactive<AppSettings>({ ...DEFAULT_SETTINGS })
 const status = ref<SchedulerStatus>({
   enabled: true,
@@ -78,6 +80,20 @@ async function saveSettings(): Promise<void> {
   }
 }
 
+async function completeSetup(): Promise<void> {
+  const api = window.settingsApi
+  if (!api || saving.value) {
+    return
+  }
+
+  saving.value = true
+  try {
+    await api.completeSetup(cloneSettings(form))
+  } finally {
+    saving.value = false
+  }
+}
+
 async function testReminder(): Promise<void> {
   await window.settingsApi?.testReminder()
   await refreshStatus()
@@ -97,9 +113,11 @@ function setIntervalMinutes(minutes: number): void {
 
 onMounted(async () => {
   await loadSettings()
-  unsubscribeStatus = window.settingsApi?.onSchedulerStatus((next) => {
-    status.value = next
-  })
+  if (!isSetupMode) {
+    unsubscribeStatus = window.settingsApi?.onSchedulerStatus((next) => {
+      status.value = next
+    })
+  }
 })
 
 onUnmounted(() => {
@@ -113,14 +131,18 @@ onUnmounted(() => {
 <template>
   <div class="settings-page">
     <header class="page-header">
-      <h1>Desktop Companion Settings</h1>
-      <p class="subtitle">Configure reminders and appearance</p>
+      <h1 v-if="isSetupMode">Welcome to your Desktop Companion 👋</h1>
+      <h1 v-else>Desktop Companion Settings</h1>
+      <p v-if="isSetupMode" class="subtitle">
+        Let's set up your companion before we start.
+      </p>
+      <p v-else class="subtitle">Configure reminders and appearance</p>
     </header>
 
     <section class="card">
       <h2>General</h2>
 
-      <label class="row">
+      <label v-if="!isSetupMode" class="row">
         <span>Start with Windows</span>
         <button
           type="button"
@@ -167,21 +189,21 @@ onUnmounted(() => {
             :class="{ active: form.general.characterPosition === 'bottom-left' }"
             @click="setCharacterPosition('bottom-left')"
           >
-            Bottom Left
+            {{ isSetupMode ? 'Left' : 'Bottom Left' }}
           </button>
           <button
             type="button"
             :class="{ active: form.general.characterPosition === 'bottom-center' }"
             @click="setCharacterPosition('bottom-center')"
           >
-            Bottom Center
+            {{ isSetupMode ? 'Center' : 'Bottom Center' }}
           </button>
           <button
             type="button"
             :class="{ active: form.general.characterPosition === 'bottom-right' }"
             @click="setCharacterPosition('bottom-right')"
           >
-            Bottom Right
+            {{ isSetupMode ? 'Right' : 'Bottom Right' }}
           </button>
         </div>
       </div>
@@ -202,13 +224,13 @@ onUnmounted(() => {
         </button>
       </label>
 
-      <div class="field">
+      <div v-if="!isSetupMode" class="field">
         <span class="label">Reminder mode</span>
         <div class="mode-pill">Interval</div>
       </div>
 
       <div class="field">
-        <span class="label">Interval</span>
+        <span class="label">{{ isSetupMode ? 'Remind me every' : 'Interval' }}</span>
         <select
           :value="form.reminders.intervalMinutes"
           @change="setIntervalMinutes(Number(($event.target as HTMLSelectElement).value))"
@@ -225,16 +247,16 @@ onUnmounted(() => {
             }}
           </option>
         </select>
-        <p class="hint">Current: {{ intervalLabel }}</p>
+        <p v-if="!isSetupMode" class="hint">Current: {{ intervalLabel }}</p>
       </div>
 
       <div class="time-grid">
         <label>
-          Start time
+          {{ isSetupMode ? 'From' : 'Start time' }}
           <input v-model="form.reminders.startTime" type="time" />
         </label>
         <label>
-          End time
+          {{ isSetupMode ? 'To' : 'End time' }}
           <input v-model="form.reminders.endTime" type="time" />
         </label>
       </div>
@@ -262,11 +284,16 @@ onUnmounted(() => {
         </label>
       </div>
 
-      <button type="button" class="btn-test" @click="testReminder">
+      <button
+        v-if="!isSetupMode"
+        type="button"
+        class="btn-test"
+        @click="testReminder"
+      >
         ▶ Test Reminder
       </button>
 
-      <div class="status-box">
+      <div v-if="!isSetupMode" class="status-box">
         <p>
           <strong>Reminder status:</strong>
           <span v-if="status.enabled" class="status-on">● Enabled</span>
@@ -304,7 +331,22 @@ onUnmounted(() => {
     </section>
 
     <footer class="footer">
-      <button type="button" class="btn-save" :disabled="saving" @click="saveSettings">
+      <button
+        v-if="isSetupMode"
+        type="button"
+        class="btn-save btn-start"
+        :disabled="saving"
+        @click="completeSetup"
+      >
+        Save &amp; Start 🚀
+      </button>
+      <button
+        v-else
+        type="button"
+        class="btn-save"
+        :disabled="saving"
+        @click="saveSettings"
+      >
         Save Settings
       </button>
       <span v-if="savedMessage" class="saved">{{ savedMessage }}</span>
@@ -497,6 +539,12 @@ input[type='range'] {
 .btn-save:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-start {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
 }
 
 .saved {

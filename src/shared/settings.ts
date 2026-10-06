@@ -24,6 +24,7 @@ export interface SoundSettings {
 }
 
 export interface AppSettings {
+  setupCompleted: boolean
   general: GeneralSettings
   reminders: ReminderSettings
   sound: SoundSettings
@@ -43,6 +44,7 @@ export const CHARACTER_WIDTH_PX: Record<CharacterSize, number> = {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  setupCompleted: false,
   general: {
     startWithWindows: true,
     characterSize: 'medium',

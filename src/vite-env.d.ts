@@ -42,6 +42,7 @@ interface DesktopCompanionApi {
 interface SettingsApi {
   getSettings: () => Promise<AppSettings>
   saveSettings: (settings: AppSettings) => Promise<AppSettings>
+  completeSetup: (settings: AppSettings) => Promise<AppSettings>
   testReminder: () => Promise<void>
   getSchedulerStatus: () => Promise<SchedulerStatus>
   onSchedulerStatus: (callback: (status: SchedulerStatus) => void) => () => void
