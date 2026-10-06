@@ -1,8 +1,4 @@
 <script setup lang="ts">
-defineProps<{
-  visible: boolean
-}>()
-
 const emit = defineEmits<{
   remindLater: []
   yes: []
@@ -10,7 +6,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div v-show="visible" class="reminder-ui" aria-live="polite">
+  <div class="reminder-ui" aria-live="polite">
     <div class="speech-bubble">
       <p class="speech-text">Time to drink some water! 💧</p>
       <div class="actions">

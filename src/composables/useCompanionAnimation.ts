@@ -1,4 +1,4 @@
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
+import { nextTick, onMounted, ref, useTemplateRef } from 'vue'
 import { ANIMATION_CLIPS, type AnimationState } from '../types/animation'
 
 export function useCompanionAnimation(options: {
@@ -12,7 +12,7 @@ export function useCompanionAnimation(options: {
   let arrivalPlayLogged = false
   let yesHappyPlayingLogged = false
 
-  const showReminderUi = computed(() => state.value === 'reminder')
+  const showReminder = ref(false)
 
   function logVideoLoadError(target: HTMLVideoElement): void {
     const path = target.currentSrc || target.src
@@ -47,6 +47,7 @@ export function useCompanionAnimation(options: {
     if (state.value === 'arriving') {
       options.onArrivalFinished()
       state.value = 'reminder'
+      showReminder.value = true
       console.log('[Companion] Reminder displayed')
       return
     }
@@ -87,6 +88,7 @@ export function useCompanionAnimation(options: {
 
   async function onRemindLater(): Promise<void> {
     console.log('[Companion] Remind later clicked')
+    showReminder.value = false
     state.value = 'remindLater'
     console.log('[Companion] Sad animation started')
     await playSrc(ANIMATION_CLIPS.remindLaterSad)
@@ -94,6 +96,7 @@ export function useCompanionAnimation(options: {
 
   async function onYes(): Promise<void> {
     console.log('[Companion] YES clicked')
+    showReminder.value = false
     state.value = 'yesHappy'
     console.log('[Companion] Happy animation started')
     await playSrc(ANIMATION_CLIPS.yesHappy)
@@ -108,7 +111,7 @@ export function useCompanionAnimation(options: {
     state,
     videoRef,
     currentSrc,
-    showReminderUi,
+    showReminder,
     onVideoEnded,
     onVideoError,
     onVideoPlaying,

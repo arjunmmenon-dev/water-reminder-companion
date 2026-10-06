@@ -9,7 +9,7 @@ const { anchorHidden, onArrivalStarted, onArrivalFinished, hideCompanion } =
 
 const {
   currentSrc,
-  showReminderUi,
+  showReminder,
   onVideoEnded,
   onVideoError,
   onVideoPlaying,
@@ -28,7 +28,7 @@ usePointerPassthrough(anchorHidden)
   <div class="companion-stage">
     <div v-show="!anchorHidden" class="character-anchor">
       <ReminderBubble
-        :visible="showReminderUi"
+        v-if="showReminder"
         @remind-later="onRemindLater"
         @yes="onYes"
       />
