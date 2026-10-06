@@ -72,6 +72,60 @@ function pushDisplaySettingsToCompanion(): void {
   )
 }
 
+const WM_ACTIVATE = 0x0006
+const WM_SETTEXT = 0x000c
+const WM_SETICON = 0x0080
+const WM_NCPAINT = 0x0085
+const WM_NCACTIVATE = 0x0086
+const CAPTION_REPAINT_MESSAGES = [
+  WM_ACTIVATE,
+  WM_SETTEXT,
+  WM_SETICON,
+  WM_NCPAINT,
+  WM_NCACTIVATE,
+]
+
+let captionRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let captionRefreshing = false
+
+// Windows' default handling of these messages can paint a classic title bar
+// into the frameless transparent window, and it persists until the window is
+// re-shown.
+function scheduleCaptionRefresh(message: number): void {
+  if (captionRefreshing || captionRefreshTimer) {
+    return
+  }
+
+  captionRefreshTimer = setTimeout(() => {
+    captionRefreshTimer = null
+    const win = companionWindow
+    if (!win || win.isDestroyed() || !win.isVisible()) {
+      return
+    }
+
+    console.log(
+      `[Companion] Caption repaint (msg 0x${message.toString(16)}) — refreshing window`,
+    )
+    captionRefreshing = true
+    win.hide()
+    win.showInactive()
+    setTimeout(() => {
+      captionRefreshing = false
+    }, 500)
+  }, 100)
+}
+
+function guardAgainstCaptionPaint(win: BrowserWindow): void {
+  if (process.platform !== 'win32') {
+    return
+  }
+  for (const message of CAPTION_REPAINT_MESSAGES) {
+    win.hookWindowMessage(message, () => {
+      scheduleCaptionRefresh(message)
+    })
+  }
+}
+
 function createCompanionWindow(): void {
   if (companionWindow && !companionWindow.isDestroyed()) {
     pushDisplaySettingsToCompanion()
@@ -131,6 +185,9 @@ function createCompanionWindow(): void {
     console.log('[Companion] Full-screen transparent stage created')
     companionWindow?.show()
     pushDisplaySettingsToCompanion()
+    if (companionWindow) {
+      guardAgainstCaptionPaint(companionWindow)
+    }
   })
 
   companionWindow.webContents.on('did-finish-load', () => {
