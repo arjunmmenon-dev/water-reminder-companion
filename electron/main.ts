@@ -59,6 +59,7 @@ function sendCompanionTrigger(source: 'scheduled' | 'test'): void {
   if (!companionWindow || companionWindow.isDestroyed()) {
     return
   }
+  refreshCompanionWindow('reminder trigger')
   companionWindow.webContents.send('companion:trigger-reminder', { source })
 }
 
@@ -91,6 +92,21 @@ let captionRefreshing = false
 // Windows' default handling of these messages can paint a classic title bar
 // into the frameless transparent window, and it persists until the window is
 // re-shown.
+function refreshCompanionWindow(reason: string): void {
+  const win = companionWindow
+  if (!win || win.isDestroyed() || !win.isVisible()) {
+    return
+  }
+
+  console.log(`[Companion] Refreshing window (${reason})`)
+  captionRefreshing = true
+  win.hide()
+  win.showInactive()
+  setTimeout(() => {
+    captionRefreshing = false
+  }, 500)
+}
+
 function scheduleCaptionRefresh(message: number): void {
   if (captionRefreshing || captionRefreshTimer) {
     return
@@ -98,20 +114,7 @@ function scheduleCaptionRefresh(message: number): void {
 
   captionRefreshTimer = setTimeout(() => {
     captionRefreshTimer = null
-    const win = companionWindow
-    if (!win || win.isDestroyed() || !win.isVisible()) {
-      return
-    }
-
-    console.log(
-      `[Companion] Caption repaint (msg 0x${message.toString(16)}) — refreshing window`,
-    )
-    captionRefreshing = true
-    win.hide()
-    win.showInactive()
-    setTimeout(() => {
-      captionRefreshing = false
-    }, 500)
+    refreshCompanionWindow(`caption repaint msg 0x${message.toString(16)}`)
   }, 100)
 }
 
@@ -253,6 +256,7 @@ function createSettingsWindow(mode: 'setup' | 'settings'): void {
   settingsWindow.on('closed', () => {
     settingsWindow = null
     settingsWindowMode = null
+    refreshCompanionWindow('settings closed')
   })
 }
 

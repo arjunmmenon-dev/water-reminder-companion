@@ -3,6 +3,10 @@ import { ANIMATION_CLIPS, type AnimationState } from '../types/animation'
 
 const REMINDER_BEFORE_END_SEC = 2.5
 
+function arrivalReminderTime(durationSec: number): number {
+  return Math.max(0, durationSec - REMINDER_BEFORE_END_SEC)
+}
+
 export function useCompanionAnimation(options: {
   onArrivalStarted: () => void
   onArrivalFinished: () => void
@@ -25,6 +29,7 @@ export function useCompanionAnimation(options: {
   let yesHappyPlayingLogged = false
   let reminderShown = false
   let arrivalReminderLocked = false
+  let arrivalDurationSec = 0
 
   function logVideoLoadError(
     target: HTMLVideoElement,
@@ -37,6 +42,7 @@ export function useCompanionAnimation(options: {
   function resetArrivalReminderScheduling(): void {
     reminderShown = false
     arrivalReminderLocked = false
+    arrivalDurationSec = 0
   }
 
   function resetSessionState(): void {
@@ -61,6 +67,23 @@ export function useCompanionAnimation(options: {
     showReminder.value = true
     if (fromEarlyTrigger) {
       console.log('[Companion] Reminder shown before arrival finished')
+    }
+  }
+
+  function tryShowArrivalReminderByTime(video: HTMLVideoElement): void {
+    if (state.value !== 'arriving' || arrivalReminderLocked || reminderShown) {
+      return
+    }
+
+    const duration =
+      arrivalDurationSec > 0 ? arrivalDurationSec : video.duration
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return
+    }
+
+    const reminderTime = arrivalReminderTime(duration)
+    if (video.currentTime >= reminderTime) {
+      showReminderOnce(true)
     }
   }
 
@@ -101,9 +124,11 @@ export function useCompanionAnimation(options: {
       return
     }
 
-    const triggerTime = Math.max(0, video.duration - REMINDER_BEFORE_END_SEC)
-    console.log(`[Companion] Arrival duration: ${video.duration}`)
-    console.log(`[Companion] Reminder trigger time: ${triggerTime}`)
+    arrivalDurationSec = video.duration
+    const reminderTime = arrivalReminderTime(arrivalDurationSec)
+    console.log(`[Companion] Arrival duration: ${arrivalDurationSec}`)
+    console.log(`[Companion] Reminder trigger time: ${reminderTime}`)
+    tryShowArrivalReminderByTime(video)
   }
 
   function onVideoTimeUpdate(): void {
@@ -117,17 +142,8 @@ export function useCompanionAnimation(options: {
       return
     }
 
-    if (state.value !== 'arriving' || arrivalReminderLocked) {
-      return
-    }
-
-    if (!Number.isFinite(video.duration)) {
-      return
-    }
-
-    const triggerTime = Math.max(0, video.duration - REMINDER_BEFORE_END_SEC)
-    if (video.currentTime >= triggerTime) {
-      showReminderOnce(true)
+    if (state.value === 'arriving') {
+      tryShowArrivalReminderByTime(video)
     }
   }
 
