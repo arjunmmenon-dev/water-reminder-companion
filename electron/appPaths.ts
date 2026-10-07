@@ -18,11 +18,11 @@ function fileExists(filePath: string): boolean {
  */
 export function getAppIconPath(): string | undefined {
   const candidates = [
+    path.join(process.resourcesPath, 'assets/icons/app-icon.png'),
     path.join(moduleDir, 'assets/icons/app-icon.png'),
     path.join(moduleDir, '../src/assets/icons/app-icon.png'),
-    path.join(app.getAppPath(), 'src/assets/icons/app-icon.png'),
     path.join(app.getAppPath(), 'assets/icons/app-icon.png'),
-    path.join(process.resourcesPath, 'assets/icons/app-icon.png'),
+    path.join(app.getAppPath(), 'src/assets/icons/app-icon.png'),
     path.join(process.resourcesPath, 'app-icon.png'),
   ]
 
